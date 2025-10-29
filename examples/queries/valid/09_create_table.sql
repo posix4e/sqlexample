@@ -1,0 +1,9 @@
+-- CREATE TABLE statement
+CREATE TABLE products (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  price DECIMAL(10,2) DEFAULT 0.00,
+  stock INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP
+);
