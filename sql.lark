@@ -1,0 +1,511 @@
+// SQL Grammar for Lark Parser
+// Comprehensive SQL grammar covering DML, DDL, DCL, and TCL
+
+// Entry point
+start: statement_list
+
+statement_list: statement (";" statement)* ";"?
+
+statement: select_stmt
+         | insert_stmt
+         | update_stmt
+         | delete_stmt
+         | merge_stmt
+         | create_table_stmt
+         | drop_table_stmt
+         | alter_table_stmt
+         | truncate_stmt
+         | create_index_stmt
+         | drop_index_stmt
+         | create_view_stmt
+         | drop_view_stmt
+         | create_database_stmt
+         | drop_database_stmt
+         | create_schema_stmt
+         | drop_schema_stmt
+         | grant_stmt
+         | revoke_stmt
+         | begin_stmt
+         | commit_stmt
+         | rollback_stmt
+         | set_stmt
+
+// SELECT Statement with CTEs
+select_stmt: with_clause? query_expression
+
+with_clause: WITH RECURSIVE? cte ("," cte)*
+
+cte: identifier ("(" column_list ")")? AS "(" query_expression ")"
+
+query_expression: query_term (set_operation query_term)*
+
+set_operation: (UNION | INTERSECT | EXCEPT) (ALL | DISTINCT)?
+
+query_term: query_spec
+          | "(" query_expression ")"
+
+query_spec: SELECT set_quantifier? select_list from_clause? where_clause? group_by_clause? having_clause? order_by_clause? limit_clause?
+
+set_quantifier: DISTINCT | ALL
+
+select_list: "*"
+           | select_item ("," select_item)*
+
+select_item: expression (AS identifier)?
+           | identifier "." "*"
+
+from_clause: FROM table_references
+
+table_references: table_reference ("," table_reference)*
+
+table_reference: table_factor join_spec*
+
+table_factor: table_name alias_clause?
+            | "(" query_expression ")" alias_clause
+            | "(" table_reference ")"
+
+join_spec: join_type? JOIN table_factor join_condition
+
+join_type: INNER
+         | LEFT OUTER?
+         | RIGHT OUTER?
+         | FULL OUTER?
+         | CROSS
+
+join_condition: ON expression
+              | USING "(" column_list ")"
+
+alias_clause: (AS)? identifier
+
+where_clause: WHERE expression
+
+group_by_clause: GROUP BY expression_list
+
+having_clause: HAVING expression
+
+order_by_clause: ORDER BY order_item ("," order_item)*
+
+order_item: expression (ASC | DESC)? (NULLS (FIRST | LAST))?
+
+limit_clause: LIMIT (number | ALL) (OFFSET number)?
+
+// INSERT Statement
+insert_stmt: INSERT INTO table_name ("(" column_list ")")? insert_source on_conflict_clause?
+
+insert_source: VALUES value_list ("," value_list)*
+             | query_expression
+             | DEFAULT VALUES
+
+value_list: "(" expression_list ")"
+
+on_conflict_clause: ON CONFLICT ("(" column_list ")")? conflict_action
+
+conflict_action: DO NOTHING
+               | DO UPDATE SET assignment_list where_clause?
+
+column_list: identifier ("," identifier)*
+
+// UPDATE Statement
+update_stmt: UPDATE table_name alias_clause? SET assignment_list where_clause?
+
+assignment_list: assignment ("," assignment)*
+
+assignment: identifier "=" expression
+
+// DELETE Statement
+delete_stmt: DELETE FROM table_name alias_clause? where_clause?
+
+// MERGE Statement
+merge_stmt: MERGE INTO table_name alias_clause? USING table_reference ON expression merge_when_clause+
+
+merge_when_clause: WHEN MATCHED (AND expression)? THEN merge_update_delete | WHEN NOT MATCHED (AND expression)? THEN merge_insert
+
+merge_update_delete: UPDATE SET assignment_list | DELETE
+
+merge_insert: INSERT ("(" column_list ")")? VALUES "(" expression_list ")"
+
+// TRUNCATE Statement
+truncate_stmt: TRUNCATE TABLE? table_name (CASCADE | RESTRICT)?
+
+// CREATE TABLE Statement
+create_table_stmt: CREATE temp_keyword? TABLE if_not_exists? table_name ("(" table_element_list ")" | AS query_expression) table_options?
+
+temp_keyword: TEMPORARY | TEMP
+
+if_not_exists: IF NOT EXISTS
+
+if_exists: IF EXISTS
+
+table_element_list: table_element ("," table_element)*
+
+table_element: column_def
+             | table_constraint
+
+column_def: identifier data_type column_constraint*
+
+data_type: int_type
+         | varchar_type
+         | char_type
+         | text_type
+         | decimal_type
+         | float_type
+         | datetime_type
+         | boolean_type
+         | json_type
+         | uuid_type
+         | blob_type
+
+int_type: INT | INTEGER | BIGINT | SMALLINT | TINYINT | SERIAL
+
+varchar_type: VARCHAR "(" number ")"
+
+char_type: CHAR "(" number ")"
+
+text_type: TEXT
+
+decimal_type: DECIMAL ("(" number ("," number)? ")")?
+            | NUMERIC ("(" number ("," number)? ")")?
+
+float_type: FLOAT | DOUBLE | REAL
+
+datetime_type: DATE
+             | TIME (WITH TIME ZONE | WITHOUT TIME ZONE)?
+             | TIMESTAMP (WITH TIME ZONE | WITHOUT TIME ZONE)?
+             | DATETIME
+
+boolean_type: BOOLEAN | BOOL
+
+json_type: JSON | JSONB
+
+uuid_type: UUID
+
+blob_type: BLOB | BYTEA
+
+column_constraint: PRIMARY KEY
+                 | NOT NULL
+                 | NULL
+                 | UNIQUE
+                 | AUTO_INCREMENT
+                 | DEFAULT expression
+                 | CHECK "(" expression ")"
+                 | REFERENCES table_name ("(" identifier ")")?
+
+table_constraint: PRIMARY KEY "(" column_list ")"
+                | UNIQUE "(" column_list ")"
+                | FOREIGN KEY "(" column_list ")" REFERENCES table_name ("(" column_list ")")? on_delete? on_update?
+                | CHECK "(" expression ")"
+
+on_delete: ON DELETE referential_action
+
+on_update: ON UPDATE referential_action
+
+referential_action: CASCADE | SET NULL | SET DEFAULT | RESTRICT | NO ACTION
+
+table_options: table_option ("," table_option)*
+
+table_option: ENGINE "=" identifier
+            | CHARSET "=" identifier
+
+// DROP TABLE Statement
+drop_table_stmt: DROP TABLE if_exists? table_name (CASCADE | RESTRICT)?
+
+// ALTER TABLE Statement
+alter_table_stmt: ALTER TABLE table_name alter_action
+
+alter_action: ADD COLUMN? column_def
+            | DROP COLUMN? identifier (CASCADE | RESTRICT)?
+            | ALTER COLUMN? identifier alter_column_action
+            | RENAME TO table_name
+
+alter_column_action: SET DEFAULT expression
+                   | DROP DEFAULT
+                   | SET NOT NULL
+                   | DROP NOT NULL
+
+// CREATE INDEX Statement
+create_index_stmt: CREATE UNIQUE? INDEX if_not_exists? index_name ON table_name "(" column_list ")"
+
+index_name: identifier
+
+// DROP INDEX Statement
+drop_index_stmt: DROP INDEX if_exists? index_name
+
+// CREATE VIEW Statement
+create_view_stmt: CREATE (OR REPLACE)? VIEW if_not_exists? view_name ("(" column_list ")")? AS query_expression
+
+view_name: identifier
+
+// DROP VIEW Statement
+drop_view_stmt: DROP VIEW if_exists? view_name (CASCADE | RESTRICT)?
+
+// CREATE DATABASE Statement
+create_database_stmt: CREATE DATABASE if_not_exists? database_name
+
+database_name: identifier
+
+// DROP DATABASE Statement
+drop_database_stmt: DROP DATABASE if_exists? database_name
+
+// CREATE SCHEMA Statement
+create_schema_stmt: CREATE SCHEMA if_not_exists? schema_name
+
+schema_name: identifier
+
+// DROP SCHEMA Statement
+drop_schema_stmt: DROP SCHEMA if_exists? schema_name (CASCADE | RESTRICT)?
+
+// GRANT Statement
+grant_stmt: GRANT privileges ON grant_object TO grantee_list
+
+privileges: ALL PRIVILEGES?
+          | privilege_list
+
+privilege_list: privilege ("," privilege)*
+
+privilege: SELECT | INSERT | UPDATE | DELETE | REFERENCES | CREATE | DROP | ALTER | EXECUTE | USAGE
+
+grant_object: TABLE? table_name
+            | DATABASE database_name
+            | SCHEMA schema_name
+
+grantee_list: grantee ("," grantee)*
+
+grantee: identifier | PUBLIC
+
+// REVOKE Statement
+revoke_stmt: REVOKE privileges ON grant_object FROM grantee_list
+
+// Transaction Control
+begin_stmt: (BEGIN | START) TRANSACTION?
+
+commit_stmt: COMMIT WORK?
+
+rollback_stmt: ROLLBACK WORK? (TO SAVEPOINT? identifier)?
+
+// SET Statement
+set_stmt: SET identifier "=" set_value
+
+set_value: expression
+         | ON
+         | OFF
+
+// Expressions
+expression: or_expr
+
+or_expr: and_expr (OR and_expr)*
+
+and_expr: not_expr (AND not_expr)*
+
+not_expr: NOT not_expr
+        | comparison_expr
+
+comparison_expr: additive_expr (comparison_op additive_expr)?
+               | additive_expr not? BETWEEN additive_expr AND additive_expr
+               | additive_expr not? IN "(" (expression_list | query_expression) ")"
+               | additive_expr not? LIKE additive_expr
+               | additive_expr IS not? NULL
+               | EXISTS "(" query_expression ")"
+
+not: NOT
+
+comparison_op: "=" | "!=" | "<>" | "<" | ">" | "<=" | ">="
+
+additive_expr: multiplicative_expr (("+"|"-"|"||") multiplicative_expr)*
+
+multiplicative_expr: unary_expr (("*"|"/"|"%") unary_expr)*
+
+unary_expr: ("+"|"-") unary_expr
+          | primary_expr
+
+primary_expr: literal
+            | identifier
+            | column_ref
+            | function_call
+            | case_expression
+            | cast_expression
+            | "(" expression ")"
+            | "(" query_expression ")"
+
+column_ref: identifier "." identifier ("." identifier)?
+
+function_call: identifier "(" function_args? ")"
+
+function_args: DISTINCT? (expression_list | "*")
+
+case_expression: CASE expression? when_clause+ (ELSE expression)? END
+
+when_clause: WHEN expression THEN expression
+
+cast_expression: CAST "(" expression AS data_type ")"
+               | expression "::" data_type
+
+expression_list: expression ("," expression)*
+
+// Basic tokens
+table_name: identifier ("." identifier)*
+
+identifier: CNAME | QUOTED_ID
+
+number: SIGNED_NUMBER | NUMBER
+
+literal: number
+       | string
+       | TRUE
+       | FALSE
+       | NULL
+
+string: SQL_STRING
+
+// Keywords (case-insensitive)
+SELECT: "select"i
+FROM: "from"i
+WHERE: "where"i
+INSERT: "insert"i
+INTO: "into"i
+VALUES: "values"i
+UPDATE: "update"i
+SET: "set"i
+DELETE: "delete"i
+MERGE: "merge"i
+USING: "using"i
+MATCHED: "matched"i
+CREATE: "create"i
+TABLE: "table"i
+VIEW: "view"i
+INDEX: "index"i
+DROP: "drop"i
+ALTER: "alter"i
+ADD: "add"i
+COLUMN: "column"i
+RENAME: "rename"i
+TO: "to"i
+IF: "if"i
+NOT: "not"i
+EXISTS: "exists"i
+AS: "as"i
+WITH: "with"i
+RECURSIVE: "recursive"i
+JOIN: "join"i
+INNER: "inner"i
+LEFT: "left"i
+RIGHT: "right"i
+FULL: "full"i
+CROSS: "cross"i
+OUTER: "outer"i
+ON: "on"i
+GROUP: "group"i
+BY: "by"i
+HAVING: "having"i
+ORDER: "order"i
+ASC: "asc"i
+DESC: "desc"i
+LIMIT: "limit"i
+OFFSET: "offset"i
+NULLS: "nulls"i
+FIRST: "first"i
+LAST: "last"i
+AND: "and"i
+OR: "or"i
+BETWEEN: "between"i
+IN: "in"i
+LIKE: "like"i
+IS: "is"i
+NULL: "null"i
+TRUE: "true"i
+FALSE: "false"i
+CASE: "case"i
+WHEN: "when"i
+THEN: "then"i
+ELSE: "else"i
+END: "end"i
+CAST: "cast"i
+PRIMARY: "primary"i
+KEY: "key"i
+FOREIGN: "foreign"i
+REFERENCES: "references"i
+UNIQUE: "unique"i
+DEFAULT: "default"i
+CHECK: "check"i
+AUTO_INCREMENT: "auto_increment"i
+CASCADE: "cascade"i
+RESTRICT: "restrict"i
+NO: "no"i
+ACTION: "action"i
+UNION: "union"i
+INTERSECT: "intersect"i
+EXCEPT: "except"i
+ALL: "all"i
+DISTINCT: "distinct"i
+TEMPORARY: "temporary"i
+TEMP: "temp"i
+GRANT: "grant"i
+REVOKE: "revoke"i
+PRIVILEGES: "privileges"i
+PUBLIC: "public"i
+BEGIN: "begin"i
+START: "start"i
+COMMIT: "commit"i
+ROLLBACK: "rollback"i
+SAVEPOINT: "savepoint"i
+TRANSACTION: "transaction"i
+WORK: "work"i
+DATABASE: "database"i
+SCHEMA: "schema"i
+ENGINE: "engine"i
+CHARSET: "charset"i
+TRUNCATE: "truncate"i
+CONFLICT: "conflict"i
+DO: "do"i
+NOTHING: "nothing"i
+REPLACE: "replace"i
+EXECUTE: "execute"i
+USAGE: "usage"i
+TIME: "time"i
+ZONE: "zone"i
+WITHOUT: "without"i
+OFF: "off"i
+
+// Data types
+INT: "int"i
+INTEGER: "integer"i
+BIGINT: "bigint"i
+SMALLINT: "smallint"i
+TINYINT: "tinyint"i
+VARCHAR: "varchar"i
+CHAR: "char"i
+TEXT: "text"i
+DECIMAL: "decimal"i
+NUMERIC: "numeric"i
+FLOAT: "float"i
+DOUBLE: "double"i
+REAL: "real"i
+DATE: "date"i
+TIMESTAMP: "timestamp"i
+DATETIME: "datetime"i
+BOOLEAN: "boolean"i
+BOOL: "bool"i
+BLOB: "blob"i
+JSON: "json"i
+JSONB: "jsonb"i
+UUID: "uuid"i
+BYTEA: "bytea"i
+SERIAL: "serial"i
+
+// Import standard tokens
+%import common.CNAME
+%import common.NUMBER
+%import common.SIGNED_NUMBER
+%import common.WS
+%ignore WS
+
+// Custom terminals
+SQL_STRING: /'[^']*'/ | /"[^"]*"/
+QUOTED_ID: /`[^`]+`/
+
+// SQL comments (-- style and # style)
+// In regex, . doesn't match newlines by default
+SQL_COMMENT: /--.*/
+HASH_COMMENT: /#.*/
+
+%ignore SQL_COMMENT
+%ignore HASH_COMMENT
